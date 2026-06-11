@@ -2,6 +2,8 @@
 
 In this project I am seeking to learn and practice about computational linguistics.
 
+![Frontend Demo](demo.gif)
+
 ## 1. Environment and libraries
 - spaCy
 ```powershell
@@ -186,3 +188,71 @@ The API handles automated text analysis via data payloads. Sending a direct brow
 ```
 
 ![FastAPI Interactive Documentation](output2.png)
+
+## 4. Web Frontend
+
+An interactive [`index.html`](index.html) connects the FastAPI backend to a browser UI — no page reloads, no framework dependencies.
+
+### How to run
+
+```powershell
+# Start the server (serves both the API and the UI)
+python3 -m uvicorn main:app --reload
+```
+
+Then open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser.
+
+> **Note:** Opening `index.html` directly as a local file (`file://`) will fail — the browser blocks cross-origin requests from the filesystem. Always access the UI through the FastAPI server URL above.
+
+### Features
+- **Text input** — large textarea with `Cmd/Ctrl + Enter` shortcut to submit.
+- **Grammar & Morphology panel** — each token rendered as a colored badge showing the word, POS category, and morphological features (tense, number, case…).
+- **Named Entity panel** — pill badges color-coded by entity type (PERSON, GPE, ORG, DATE, LOC…).
+- **Error handling** — clear message if the API server is not reachable.
+
+### POS color legend
+| Color | Categories |
+|-------|-----------|
+| Blue | NOUN |
+| Purple | PROPN (proper noun) |
+| Green | VERB |
+| Yellow | ADJ |
+| Pink | ADV |
+| Orange | ADP (preposition) |
+| Teal | DET |
+| Cyan | CCONJ / SCONJ |
+| Gray | PUNCT / other |
+
+### Sample sentences to test
+
+Try these to cover a wide range of POS tags and entity types:
+
+```
+Yesterday, Alice and Bob visited Paris to buy a new smartphone from Apple.
+```
+> Covers: DATE, PERSON ×2, GPE, ORG — the classic baseline.
+
+```
+Elon Musk announced that Tesla will launch a new electric vehicle in Berlin next Monday.
+```
+> Covers: PERSON, ORG ×2, GPE, DATE — good for multi-entity sentences.
+
+```
+The quick brown fox jumps over the lazy dog.
+```
+> Covers: ADJ ×3, NOUN ×2, VERB — no entities, pure grammar/morphology check.
+
+```
+She quickly ran to the nearest hospital after the accident on Fifth Avenue.
+```
+> Covers: PRON, ADV, VERB, LOC — tests location entities and adverbs.
+
+```
+In 1969, NASA sent Neil Armstrong to the Moon during the Apollo 11 mission.
+```
+> Covers: DATE, ORG, PERSON, LOC, EVENT — rich entity mix.
+
+```
+The European Central Bank raised interest rates by 0.5% on Thursday.
+```
+> Covers: ORG, MONEY/PERCENT, DATE — financial/economic domain.

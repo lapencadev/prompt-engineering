@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linguistic Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .badge { display: inline-flex; flex-direction: column; align-items: center; margin: 4px; padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; line-height: 1.2; }
+    .badge .word { font-weight: 700; font-size: 0.95rem; }
+    .badge .tag  { font-size: 0.65rem; opacity: 0.85; letter-spacing: 0.05em; text-transform: uppercase; }
+    .entity-pill { display: inline-block; margin: 4px; padding: 5px 14px; border-radius: 9999px; font-size: 0.85rem; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center py-12 px-4">
+
+  <div class="w-full max-w-3xl">
+    <!-- Header -->
+    <div class="mb-10 text-center">
+      <h1 class="text-4xl font-bold tracking-tight text-white mb-2">Linguistic Analyzer</h1>
+      <p class="text-gray-400 text-sm">Grammar · Morphology · Named Entity Recognition · Powered by spaCy</p>
+    </div>
+
+    <!-- Input -->
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6 shadow-lg">
+      <label for="inputText" class="block text-sm font-medium text-gray-300 mb-3">Enter an English sentence</label>
+      <textarea
+        id="inputText"
+        rows="4"
+        placeholder="e.g. Yesterday, Alice and Bob visited Paris to buy a new smartphone from Apple."
+        class="w-full bg-gray-800 text-gray-100 placeholder-gray-500 border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+      ></textarea>
+      <button
+        id="analyzeBtn"
+        onclick="analyze()"
+        class="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition-colors duration-150 text-sm tracking-wide"
+      >
+        Analyze Text
+      </button>
+      <p id="errorMsg" class="mt-3 text-red-400 text-sm hidden"></p>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden space-y-6">
+
+      <!-- Grammar Tags -->
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-lg">
+        <h2 class="text-lg font-semibold text-white mb-1">Grammar & Morphology</h2>
+        <p class="text-gray-500 text-xs mb-4">Each token is labeled with its part-of-speech category and morphological features.</p>
+        <div id="tokensContainer" class="flex flex-wrap"></div>
+        <!-- Legend -->
+        <div class="mt-5 flex flex-wrap gap-2 border-t border-gray-800 pt-4">
+          <span class="text-xs text-gray-500 self-center mr-1">Legend:</span>
+          <span class="badge bg-blue-900/60 text-blue-200"><span class="tag">NOUN</span></span>
+          <span class="badge bg-purple-900/60 text-purple-200"><span class="tag">PROPN</span></span>
+          <span class="badge bg-green-900/60 text-green-200"><span class="tag">VERB</span></span>
+          <span class="badge bg-yellow-900/60 text-yellow-200"><span class="tag">ADJ</span></span>
+          <span class="badge bg-pink-900/60 text-pink-200"><span class="tag">ADV</span></span>
+          <span class="badge bg-orange-900/60 text-orange-200"><span class="tag">ADP</span></span>
+          <span class="badge bg-teal-900/60 text-teal-200"><span class="tag">DET</span></span>
+          <span class="badge bg-cyan-900/60 text-cyan-200"><span class="tag">CCONJ</span></span>
+          <span class="badge bg-gray-700/80 text-gray-300"><span class="tag">OTHER</span></span>
+        </div>
+      </div>
+
+      <!-- Named Entities -->
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-lg">
+        <h2 class="text-lg font-semibold text-white mb-1">Named Entities (NER)</h2>
+        <p class="text-gray-500 text-xs mb-4">Recognized real-world entities such as people, places, organizations, and dates.</p>
+        <div id="entitiesContainer" class="flex flex-wrap"></div>
+        <p id="noEntities" class="text-gray-500 text-sm hidden">No named entities found.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const POS_COLORS = {
+      NOUN:  'bg-blue-900/60 text-blue-200',
+      PROPN: 'bg-purple-900/60 text-purple-200',
+      VERB:  'bg-green-900/60 text-green-200',
+      ADJ:   'bg-yellow-900/60 text-yellow-200',
+      ADV:   'bg-pink-900/60 text-pink-200',
+      ADP:   'bg-orange-900/60 text-orange-200',
+      DET:   'bg-teal-900/60 text-teal-200',
+      CCONJ: 'bg-cyan-900/60 text-cyan-200',
+      SCONJ: 'bg-cyan-900/60 text-cyan-200',
+      PUNCT: 'bg-gray-800 text-gray-500',
+    };
+
+    const ENTITY_COLORS = {
+      PERSON: 'bg-purple-800/60 text-purple-200',
+      GPE:    'bg-green-800/60 text-green-200',
+      ORG:    'bg-blue-800/60 text-blue-200',
+      DATE:   'bg-yellow-800/60 text-yellow-200',
+      LOC:    'bg-teal-800/60 text-teal-200',
+      MONEY:  'bg-emerald-800/60 text-emerald-200',
+      EVENT:  'bg-pink-800/60 text-pink-200',
+    };
+
+    async function analyze() {
+      const text = document.getElementById('inputText').value.trim();
+      const errorMsg = document.getElementById('errorMsg');
+      const btn = document.getElementById('analyzeBtn');
+
+      errorMsg.classList.add('hidden');
+
+      if (!text) {
+        errorMsg.textContent = 'Please enter some text before analyzing.';
+        errorMsg.classList.remove('hidden');
+        return;
+      }
+
+      btn.textContent = 'Analyzing…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        renderResults(data);
+      } catch (err) {
+        errorMsg.textContent = `Could not reach the API. Make sure the FastAPI server is running on localhost:8000. (${err.message})`;
+        errorMsg.classList.remove('hidden');
+      } finally {
+        btn.textContent = 'Analyze Text';
+        btn.disabled = false;
+      }
+    }
+
+    function renderResults({ tokens = [], entities = [] }) {
+      // Tokens
+      const tokensEl = document.getElementById('tokensContainer');
+      tokensEl.innerHTML = tokens.map(({ word, category, morphology }) => {
+        const color = POS_COLORS[category] || 'bg-gray-700/80 text-gray-300';
+        const morph = (morphology && morphology !== 'None') ? morphology : '';
+        return `
+          <div class="badge ${color}" title="${morph || 'No morphology'}">
+            <span class="word">${escHtml(word)}</span>
+            <span class="tag">${escHtml(category)}</span>
+            ${morph ? `<span class="tag" style="font-size:0.6rem;opacity:0.7">${escHtml(morph)}</span>` : ''}
+          </div>`;
+      }).join('');
+
+      // Entities
+      const entitiesEl = document.getElementById('entitiesContainer');
+      const noEntities = document.getElementById('noEntities');
+      if (entities.length === 0) {
+        entitiesEl.innerHTML = '';
+        noEntities.classList.remove('hidden');
+      } else {
+        noEntities.classList.add('hidden');
+        entitiesEl.innerHTML = entities.map(({ entity, type }) => {
+          const color = ENTITY_COLORS[type] || 'bg-gray-700/80 text-gray-300';
+          return `
+            <span class="entity-pill ${color}">
+              <strong>${escHtml(entity)}</strong>
+              <span class="ml-1 text-xs opacity-75">${escHtml(type)}</span>
+            </span>`;
+        }).join('');
+      }
+
+      document.getElementById('results').classList.remove('hidden');
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Allow Ctrl+Enter / Cmd+Enter to submit
+    document.getElementById('inputText').addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') analyze();
+    });
+  </script>
+
+</body>
+</html>

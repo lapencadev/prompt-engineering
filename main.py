@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import spacy
@@ -26,7 +27,7 @@ class TextInput(BaseModel):
 # Endpoints
 @app.get("/")
 def home():
-    return {"message": "Welcome to the Linguistic Analysis API! Use the /analyze endpoint to analyze your text."}
+    return FileResponse("index.html")
 
 @app.post("/analyze") 
 def analyze_text(input: TextInput):
